@@ -1,21 +1,22 @@
 workflows:
   android-apk:
     name: Hams Android APK
-    max_build_duration: 90
-    instance_type: mac_mini_m2
     environment:
       node: v22.13.1
       java: 17
     scripts:
+      - name: Extract project
+        script: unzip -q private_pair_chat.zip -d app
       - name: Install dependencies
         script: |
+          cd app
           npx --yes pnpm@9.12.0 install --frozen-lockfile
       - name: Build Android APK
         script: |
+          cd app
           npx expo prebuild --platform android --clean --non-interactive
           cd android
           ./gradlew app:assembleRelease --stacktrace --info --no-daemon
     artifacts:
-      - android/app/build/outputs/**/*.apk
-      - android/app/build/reports/**
+      - app/android/app/build/outputs/**/*.apk
       
