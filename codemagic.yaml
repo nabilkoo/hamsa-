@@ -5,16 +5,18 @@ workflows:
       node: v22.13.1
       java: 17
     scripts:
-      - name: Extract project
-        script: unzip -q private_pair_chat.zip -d app
-      - name: Install dependencies
-        script: |
-          cd app
-          npx --yes pnpm@9.12.0 install --frozen-lockfile
       - name: Build Android APK
         script: |
+          rm -rf app && mkdir app
+          unzip -q private_pair_chat.zip -d app
           cd app
+          npx --yes pnpm@9.12.0 install --frozen-lockfile
           npx expo prebuild --platform android --clean --non-interactive
+          OLD="space.manus.private.pair.chat.t20260827091834"
+          SAFE="space.manus.hams.chat.t20260827091834"
+          sed -i.bak "s/namespace '${OLD}'/namespace '${SAFE}'/" android/app/build.gradle
+          find android/app/src/main/java -name "*.kt" -type f -exec sed -i.bak "s/^package ${OLD}$/package ${SAFE}/" {} \;
+          find android -name "*.bak" -delete
           cd android
           ./gradlew app:assembleRelease --stacktrace --info --no-daemon
     artifacts:
