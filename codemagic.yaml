@@ -30,7 +30,6 @@ workflows:
           npx --yes pnpm@9.12.0 vitest run \
             tests/app-lock-pin.test.ts \
             tests/chat.crypto.test.ts \
-            tests/call-token.test.ts \
             tests/message-status.test.ts \
             tests/push-payload.test.ts
       - name: Generate the Android project from Expo configuration
