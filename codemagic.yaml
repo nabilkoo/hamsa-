@@ -63,6 +63,8 @@ workflows:
       - /tmp/xfs/**/*.log
     publishing:
       email:
+        recipients:
+          - your-nabilkoo2007@gmail.com
         notify:
           success: true
           failure: true
