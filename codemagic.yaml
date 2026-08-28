@@ -15,6 +15,12 @@ workflows:
           rm -rf ci-source
           mkdir ci-source
           unzip -q private_pair_chat.zip -d ci-source
+      - name: Write runtime environment variables
+        script: |
+          cd ci-source
+          cat >> .env <<'EOF'
+          EXPO_PUBLIC_API_BASE_URL=https://privatechat-ftcfa9ww.manus.space
+          EOF
       - name: Install locked dependencies
         script: |
           cd ci-source
