@@ -1,24 +1,68 @@
+# Android CI workflow for the Expo-based "همس" project.
+# The GitHub repository currently stores the source in private_pair_chat.zip.
+# Do not add private Firebase service-account JSON, LiveKit secrets, or signing passwords here.
 workflows:
-  android-apk:
-    name: Hams Android APK
+  android-apk-diagnostic:
+    name: Hams — Android APK
+    max_build_duration: 90
+    instance_type: mac_mini_m2
     environment:
       node: v22.13.1
       java: 17
     scripts:
-      - name: Build Android APK
+      - name: Extract the Expo project archive
         script: |
-          rm -rf app && mkdir app
-          unzip -q private_pair_chat.zip -d app
-          cd app
+          rm -rf ci-source
+          mkdir ci-source
+          unzip -q private_pair_chat.zip -d ci-source
+      - name: Install locked dependencies
+        script: |
+          cd ci-source
           npx --yes pnpm@9.12.0 install --frozen-lockfile
+      - name: Verify the Expo configuration and project types
+        script: |
+          cd ci-source
+          npx expo config --type public
+          npx --yes pnpm@9.12.0 check
+      - name: Run automated checks that need no server secret
+        script: |
+          cd ci-source
+          npx --yes pnpm@9.12.0 vitest run \
+            tests/app-lock-pin.test.ts \
+            tests/chat.crypto.test.ts \
+            tests/call-token.test.ts \
+            tests/message-status.test.ts \
+            tests/push-payload.test.ts
+      - name: Generate the Android project from Expo configuration
+        script: |
+          cd ci-source
           npx expo prebuild --platform android --clean --non-interactive
-          OLD="space.manus.private.pair.chat.t20260827091834"
-          SAFE="space.manus.hams.chat.t20260827091834"
-          sed -i.bak "s/namespace '${OLD}'/namespace '${SAFE}'/" android/app/build.gradle
-          find android/app/src/main/java -name "*.kt" -type f -exec sed -i.bak "s/^package ${OLD}$/package ${SAFE}/" {} \;
+      - name: Make the Android source namespace safe for Kotlin
+        script: |
+          cd ci-source
+          OLD_NAMESPACE="space.manus.private.pair.chat.t20260827091834"
+          SAFE_NAMESPACE="space.manus.hams.chat.t20260827091834"
+          sed -i.bak "s/namespace '${OLD_NAMESPACE}'/namespace '${SAFE_NAMESPACE}'/" android/app/build.gradle
+          find android/app/src/main/java -name "*.kt" -type f -exec sed -i.bak "s/^package ${OLD_NAMESPACE}$/package ${SAFE_NAMESPACE}/" {} \;
           find android -name "*.bak" -delete
-          cd android
-          ./gradlew app:assembleRelease --stacktrace --info --no-daemon
+      - name: Build a release APK with full Gradle diagnostics
+        script: |
+          cd ci-source/android
+          set +e
+          ./gradlew app:assembleRelease --stacktrace --info --no-daemon 2>&1 | tee ../gradle-build.log
+          BUILD_STATUS=${PIPESTATUS[0]}
+          if [ "${BUILD_STATUS}" -ne 0 ]; then
+            echo "===== GRADLE ERROR SUMMARY ====="
+            grep -n -E -A 18 -B 4 "FAILURE: Build failed|What went wrong:|Execution failed for task|error:|Exception:" ../gradle-build.log | tail -n 160 || true
+            exit "${BUILD_STATUS}"
+          fi
     artifacts:
-      - app/android/app/build/outputs/**/*.apk
-      
+      - ci-source/android/app/build/outputs/**/*.apk
+      - ci-source/android/app/build/reports/**
+      - ci-source/gradle-build.log
+      - /tmp/xfs/**/*.log
+    publishing:
+      email:
+        notify:
+          success: true
+          failure: true
